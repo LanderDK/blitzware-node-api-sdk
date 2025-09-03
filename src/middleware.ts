@@ -50,20 +50,26 @@ export function createAuth(options: AuthOptions) {
             return res.status(401).send("Unauthorized");
           }
           const token = authHeader.substr(7);
-          const data = await introspectToken(
-            token,
-            "access_token",
-            String(options.clientId),
-            String(options.clientSecret)
-          );
-          if (!data || !data.active)
+          try {
+            const data = await introspectToken(
+              token,
+              "access_token",
+              String(options.clientId),
+              String(options.clientSecret)
+            );
+            if (!data || !data.active)
+              return res.status(401).send("Unauthorized");
+            req.auth = { token, payload: data };
+          } catch (introspectionErr) {
+            console.error("Token introspection failed:", introspectionErr);
             return res.status(401).send("Unauthorized");
-          req.auth = { token, payload: data };
+          }
         }
         return next();
       } catch (err) {
-        console.error("Token introspection failed:", err);
-        return res.status(401).send("Unauthorized");
+        // Re-throw errors that occur in downstream middleware/handlers
+        // These are not authentication errors
+        return next(err);
       }
     };
   };
@@ -105,24 +111,31 @@ export function createAuth(options: AuthOptions) {
             return;
           }
           const token = authHeader.substr(7);
-          const data = await introspectToken(
-            token,
-            "access_token",
-            String(options.clientId),
-            String(options.clientSecret)
-          );
-          if (!data || !data.active) {
+          try {
+            const data = await introspectToken(
+              token,
+              "access_token",
+              String(options.clientId),
+              String(options.clientSecret)
+            );
+            if (!data || !data.active) {
+              ctx.status = 401;
+              ctx.body = "Unauthorized";
+              return;
+            }
+            ctx.state.auth = { token, payload: data };
+          } catch (introspectionErr) {
+            console.error("Token introspection failed:", introspectionErr);
             ctx.status = 401;
             ctx.body = "Unauthorized";
             return;
           }
-          ctx.state.auth = { token, payload: data };
         }
         await next();
       } catch (err) {
-        console.error("Token introspection failed:", err);
-        ctx.status = 401;
-        ctx.body = "Unauthorized";
+        // Re-throw errors that occur in downstream middleware/handlers
+        // These are not authentication errors
+        throw err;
       }
     };
   };
