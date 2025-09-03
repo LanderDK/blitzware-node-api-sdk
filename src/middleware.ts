@@ -40,37 +40,35 @@ export function createAuth(options: AuthOptions) {
 
   const expressRequire = () => {
     return async (req: any, res: any, next: any) => {
-      try {
-        if (!req.auth) {
-          // attempt introspection on-demand if parser wasn't mounted
-          const authHeader =
-            req.headers &&
-            (req.headers.authorization || req.headers.Authorization);
-          if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return res.status(401).send("Unauthorized");
-          }
-          const token = authHeader.substr(7);
-          try {
-            const data = await introspectToken(
-              token,
-              "access_token",
-              String(options.clientId),
-              String(options.clientSecret)
-            );
-            if (!data || !data.active)
-              return res.status(401).send("Unauthorized");
-            req.auth = { token, payload: data };
-          } catch (introspectionErr) {
-            console.error("Token introspection failed:", introspectionErr);
-            return res.status(401).send("Unauthorized");
-          }
+      // Handle authentication first
+      if (!req.auth) {
+        // attempt introspection on-demand if parser wasn't mounted
+        const authHeader =
+          req.headers &&
+          (req.headers.authorization || req.headers.Authorization);
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+          return res.status(401).send("Unauthorized");
         }
-        return next();
-      } catch (err) {
-        // Re-throw errors that occur in downstream middleware/handlers
-        // These are not authentication errors
-        return next(err);
+        const token = authHeader.substr(7);
+        try {
+          const data = await introspectToken(
+            token,
+            "access_token",
+            String(options.clientId),
+            String(options.clientSecret)
+          );
+          if (!data || !data.active)
+            return res.status(401).send("Unauthorized");
+          req.auth = { token, payload: data };
+        } catch (introspectionErr) {
+          console.error("Token introspection failed:", introspectionErr);
+          return res.status(401).send("Unauthorized");
+        }
       }
+      
+      // Authentication successful, proceed to next middleware
+      // Don't catch errors from downstream handlers
+      return next();
     };
   };
 
@@ -100,43 +98,41 @@ export function createAuth(options: AuthOptions) {
 
   const koaRequire = () => {
     return async (ctx: any, next: any) => {
-      try {
-        if (!ctx.state?.auth) {
-          const authHeader =
-            ctx.headers &&
-            (ctx.headers.authorization || ctx.headers.Authorization);
-          if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            ctx.status = 401;
-            ctx.body = "Unauthorized";
-            return;
-          }
-          const token = authHeader.substr(7);
-          try {
-            const data = await introspectToken(
-              token,
-              "access_token",
-              String(options.clientId),
-              String(options.clientSecret)
-            );
-            if (!data || !data.active) {
-              ctx.status = 401;
-              ctx.body = "Unauthorized";
-              return;
-            }
-            ctx.state.auth = { token, payload: data };
-          } catch (introspectionErr) {
-            console.error("Token introspection failed:", introspectionErr);
-            ctx.status = 401;
-            ctx.body = "Unauthorized";
-            return;
-          }
+      // Handle authentication first
+      if (!ctx.state?.auth) {
+        const authHeader =
+          ctx.headers &&
+          (ctx.headers.authorization || ctx.headers.Authorization);
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+          ctx.status = 401;
+          ctx.body = "Unauthorized";
+          return;
         }
-        await next();
-      } catch (err) {
-        // Re-throw errors that occur in downstream middleware/handlers
-        // These are not authentication errors
-        throw err;
+        const token = authHeader.substr(7);
+        try {
+          const data = await introspectToken(
+            token,
+            "access_token",
+            String(options.clientId),
+            String(options.clientSecret)
+          );
+          if (!data || !data.active) {
+            ctx.status = 401;
+            ctx.body = "Unauthorized";
+            return;
+          }
+          ctx.state.auth = { token, payload: data };
+        } catch (introspectionErr) {
+          console.error("Token introspection failed:", introspectionErr);
+          ctx.status = 401;
+          ctx.body = "Unauthorized";
+          return;
+        }
       }
+      
+      // Authentication successful, proceed to next middleware
+      // Don't catch errors from downstream handlers
+      await next();
     };
   };
 
