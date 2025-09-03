@@ -1,6 +1,6 @@
 {
   "name": "blitzware-node-api-sdk",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "BlitzWare Node.js SDK for Backend / Resource Server and Machine-to-Machine (API)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
