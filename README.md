@@ -10,8 +10,12 @@ of mounting a non-enforcing parser once and enforcing auth on a per-route basis.
 
 - `expressAuth(options)` -> returns an Express parser middleware. Mount with `app.use(expressAuth(...))`.
 - `expressRequireAuth()` -> returns an Express per-route enforcer middleware.
+- `expressRequireRole(role)` -> returns an Express per-route role enforcer middleware.
 - `koaAuth(options)` -> returns a Koa parser middleware. Mount with `app.use(koaAuth(...))`.
 - `koaRequireAuth()` -> returns a Koa per-route enforcer middleware.
+- `koaRequireRole(role)` -> returns a Koa per-route role enforcer middleware.
+- `createAuth(options)` -> returns an isolated auth instance with parser/enforcer middleware for Express and Koa.
+- Types: `AuthOptions`, `AuthPayload`, `AuthContext`, `AuthMiddleware`, `AuthenticatedExpressRequest`, `AuthenticatedKoaState`.
 
 These helpers are implemented in `src/middleware.ts` and re-exported from `src/index.ts` (the package entry).
 
@@ -60,7 +64,7 @@ app.listen(process.env.PORT || 3000);
 // routes/users.js
 const express = require("express");
 const router = express.Router();
-const { expressRequireAuth } = require("blitzware-node-api-sdk");
+const { expressRequireAuth, expressRequireRole } = require("blitzware-node-api-sdk");
 
 router.get("/", (req, res) => res.json({ ok: true, users: [] })); // public
 
@@ -74,6 +78,61 @@ module.exports = router;
 
 This pattern avoids re-creating auth middleware in every route file while ensuring per-route enforcement works.
 
+For apps that need multiple auth configurations, tests that must avoid global state, or explicit cache ownership,
+prefer the factory API:
+
+```js
+const express = require("express");
+const { createAuth } = require("blitzware-node-api-sdk");
+
+const auth = createAuth({
+  clientId: process.env.BLITZWARE_CLIENT_ID,
+  clientSecret: process.env.BLITZWARE_CLIENT_SECRET,
+  introspectionCacheTtlMs: 30000,
+});
+
+const app = express();
+app.use(auth.expressParse);
+app.get("/admin", auth.expressRequire(), auth.expressRequireRole("admin"), (req, res) => {
+  res.json({ ok: true, me: req.auth.payload });
+});
+```
+
+## Role-based access control
+
+The SDK provides role checking middleware for both Express and Koa. The middleware checks if the authenticated user has the required role by inspecting the `roles` array in the token's introspection payload.
+
+**Express example:**
+
+```js
+const { expressRequireAuth, expressRequireRole } = require("blitzware-node-api-sdk");
+
+// Chain with expressRequireAuth() - role check requires auth to be present
+router.post("/admin/dashboard", expressRequireAuth(), expressRequireRole("admin"), (req, res) => {
+  res.json({ ok: true, message: "Admin dashboard" });
+});
+```
+
+**Koa example:**
+
+```js
+const { koaRequireAuth, koaRequireRole } = require("blitzware-node-api-sdk");
+
+// Chain with koaRequireAuth() - role check requires auth to be present
+router.post("/admin/dashboard", koaRequireAuth(), koaRequireRole("admin"), (ctx) => {
+  ctx.body = { ok: true, message: "Admin dashboard" };
+});
+```
+
+The role middleware will:
+- Return `401 Unauthorized` if `req.auth`/`ctx.state.auth` is not set (user must be authenticated first)
+- Return `403 Forbidden` if the user doesn't have the required role
+- Allow the request to proceed if the user has the role
+
+**Important:** Role checking middleware requires that authentication has already been performed. Always use it **after** `expressRequireAuth()`/`koaRequireAuth()` or ensure the global auth parser has run. The role middleware does NOT perform token introspection itself to avoid duplicate API calls.
+
+**Note:** The role checking assumes the token introspection response includes a `roles` array in the payload. If a user has no roles, an empty array is assumed.
+
 ## Introspection behavior
 
 The SDK's introspection helper (`src/utils.ts`) calls your auth server's introspection endpoint.
@@ -83,6 +142,38 @@ when the introspection response indicates `active: true`.
 
 If you call `expressRequireAuth()` (or `koaRequireAuth()`) and the parser has not been mounted, the enforcer will
 attempt a one-shot introspection using the configured client credentials before rejecting the request.
+
+Successful introspection responses are cached per auth instance for up to 30 seconds by default. The cache is capped by
+the token's `exp` claim when present, does not cache failed introspection attempts, and coalesces concurrent checks for
+the same token. Configure it with `introspectionCacheTtlMs`, or set `introspectionCacheTtlMs: 0` to disable caching.
+
+```js
+const auth = createAuth({
+  clientId: process.env.BLITZWARE_CLIENT_ID,
+  clientSecret: process.env.BLITZWARE_CLIENT_SECRET,
+  introspectionCacheTtlMs: 10000,
+});
+```
+
+## TypeScript
+
+The SDK exports auth context types that can be used with custom request or state typing:
+
+```ts
+import type {
+  AuthenticatedExpressRequest,
+  AuthenticatedKoaState,
+  AuthPayload,
+} from "blitzware-node-api-sdk";
+
+type MyClaims = AuthPayload & {
+  sub: string;
+  roles: string[];
+};
+
+type AuthedRequest = AuthenticatedExpressRequest<MyClaims>;
+type AuthedKoaState = AuthenticatedKoaState<MyClaims>;
+```
 
 ## Configuration / environment
 
@@ -112,8 +203,7 @@ yarn test
 - If you import the SDK from `../dist` during local development, run `yarn build` in the SDK before starting your example app so
   `dist/` is up to date.
 - If you see `Auth middleware not initialized` when calling `expressRequireAuth()`, ensure you called `expressAuth(...)` earlier (it must be called at app bootstrap to configure the global client credentials), or mount the parser returned by `expressAuth(...)`.
-- The SDK intentionally leaves the choice of session/caching to the caller; consider adding short-lived caching around introspection for
-  performance in heavy-load APIs.
+- Use `createAuth(options)` when you want isolated middleware instances instead of the backwards-compatible global helper pattern.
 
 ## Contributing
 

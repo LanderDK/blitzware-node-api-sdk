@@ -1,6 +1,15 @@
 export {
+  createAuth,
   expressAuth,
   expressRequireAuth,
+  expressRequireRole,
   koaAuth,
   koaRequireAuth,
+  koaRequireRole,
+  AuthOptions,
+  AuthPayload,
+  AuthContext,
+  AuthMiddleware,
+  AuthenticatedExpressRequest,
+  AuthenticatedKoaState,
 } from "./middleware";
