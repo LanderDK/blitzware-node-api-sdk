@@ -124,6 +124,8 @@ router.post("/admin/dashboard", koaRequireAuth(), koaRequireRole("admin"), (ctx)
 });
 ```
 
+For user access tokens, BlitzWare introspection payloads can include identity metadata such as `sub`, `username`, `email`, `roles`, and token metadata such as `exp`, `iat`, `aud`, `iss`, and `jti`. The SDK does not fetch `userinfo`; it validates the token and passes the introspection payload through unchanged.
+
 The role middleware will:
 - Return `401 Unauthorized` if `req.auth`/`ctx.state.auth` is not set (user must be authenticated first)
 - Return `403 Forbidden` if the user doesn't have the required role
@@ -168,6 +170,8 @@ import type {
 
 type MyClaims = AuthPayload & {
   sub: string;
+  username: string;
+  email: string | null;
   roles: string[];
 };
 

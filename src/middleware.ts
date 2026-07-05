@@ -2,8 +2,18 @@ import { introspectToken } from "./utils";
 
 export type AuthPayload = {
   active: boolean;
+  client_id?: string;
+  username?: string;
+  email?: string | null;
+  token_type?: "access_token" | "refresh_token" | string;
+  sub?: string;
+  aud?: string;
+  iss?: string;
+  jti?: string;
   roles?: string[];
+  scope?: string;
   exp?: number;
+  iat?: number;
   [claim: string]: unknown;
 };
 
