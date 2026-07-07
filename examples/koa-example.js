@@ -12,6 +12,7 @@ app.use(
   koaAuth({
     clientId: process.env.BLITZWARE_CLIENT_ID,
     clientSecret: process.env.BLITZWARE_CLIENT_SECRET,
+    authBaseUrl: process.env.BLITZWARE_AUTH_BASE_URL,
   })
 );
 

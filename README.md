@@ -47,6 +47,9 @@ app.use(
   expressAuth({
     clientId: process.env.BLITZWARE_CLIENT_ID,
     clientSecret: process.env.BLITZWARE_CLIENT_SECRET,
+    // Optional managed auth domain from the BlitzWare dashboard.
+    // Defaults to https://auth.blitzware.xyz/api/auth/
+    authBaseUrl: process.env.BLITZWARE_AUTH_BASE_URL,
   })
 );
 
@@ -88,6 +91,7 @@ const { createAuth } = require("blitzware-node-api-sdk");
 const auth = createAuth({
   clientId: process.env.BLITZWARE_CLIENT_ID,
   clientSecret: process.env.BLITZWARE_CLIENT_SECRET,
+  authBaseUrl: process.env.BLITZWARE_AUTH_BASE_URL,
   introspectionCacheTtlMs: 30000,
 });
 
@@ -186,6 +190,7 @@ Common environment variables used in examples:
 
 - `BLITZWARE_CLIENT_ID` — client id used for token introspection
 - `BLITZWARE_CLIENT_SECRET` — client secret used for token introspection
+- `BLITZWARE_AUTH_BASE_URL` — optional managed auth base URL, for example `https://acme.auth.blitzware.xyz/api/auth/`
 - `PORT` — example server port
 
 ## Examples
@@ -204,6 +209,8 @@ yarn test
 
 ## Notes and troubleshooting
 
+- `authBaseUrl` is optional. Omit it to keep introspecting tokens at `https://auth.blitzware.xyz/api/auth/`; set it to the managed auth domain shown in the BlitzWare dashboard, such as `https://acme.auth.blitzware.xyz/api/auth/`.
+- This SDK continues to use token introspection. It does not add JWKS validation, ID token validation, or OIDC discovery requirements.
 - If you import the SDK from `../dist` during local development, run `yarn build` in the SDK before starting your example app so
   `dist/` is up to date.
 - If you see `Auth middleware not initialized` when calling `expressRequireAuth()`, ensure you called `expressAuth(...)` earlier (it must be called at app bootstrap to configure the global client credentials), or mount the parser returned by `expressAuth(...)`.

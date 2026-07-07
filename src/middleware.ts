@@ -26,6 +26,11 @@ export type AuthOptions = {
   clientId: string;
   clientSecret: string;
   /**
+   * Optional BlitzWare Auth API base URL. Defaults to
+   * https://auth.blitzware.xyz/api/auth/
+   */
+  authBaseUrl?: string;
+  /**
    * Max time to cache successful introspection responses. Defaults to 30s.
    * Set to 0 to disable caching.
    */
@@ -101,7 +106,8 @@ export function createAuth(options: AuthOptions) {
         token,
         "access_token",
         String(options.clientId),
-        String(options.clientSecret)
+        String(options.clientSecret),
+        options.authBaseUrl
       ) as Promise<AuthPayload>;
       inFlight.set(token, payloadPromise);
     }

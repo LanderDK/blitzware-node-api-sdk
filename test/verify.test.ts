@@ -9,6 +9,25 @@ describe('introspectToken', () => {
   const { introspectToken } = require('../src/utils');
     const data = await introspectToken('token', 'access_token', 'cid', 'csecret');
     expect(data.name).toBe('Alice');
+    expect((axios.create as unknown as jest.Mock)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseURL: 'https://auth.blitzware.xyz/api/auth/',
+      })
+    );
+  });
+
+  it('uses a custom managed auth base URL', async () => {
+  jest.resetModules();
+  const axios = require('axios');
+  const mockPost = jest.fn().mockResolvedValue({ data: { active: true } });
+  (axios.create as unknown as jest.Mock).mockReturnValue({ post: mockPost });
+  const { introspectToken } = require('../src/utils');
+    await introspectToken('token', 'access_token', 'cid', 'csecret', 'https://acme.auth.blitzware.xyz/api/auth');
+    expect(axios.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseURL: 'https://acme.auth.blitzware.xyz/api/auth/',
+      })
+    );
   });
 
   it('throws for inactive token', async () => {

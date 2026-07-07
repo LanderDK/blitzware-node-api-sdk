@@ -113,6 +113,34 @@ describe("Express middleware (introspection)", () => {
 
     expect(mockedIntrospectToken).toHaveBeenCalledTimes(1);
   });
+
+  it("passes custom authBaseUrl to introspection", async () => {
+    const auth = createAuth({
+      clientId: "test-client",
+      clientSecret: "test-secret",
+      authBaseUrl: "https://acme.auth.blitzware.xyz/api/auth/",
+    });
+    const customApp = express();
+    customApp.get(
+      "/custom",
+      auth.expressParse,
+      auth.expressRequire(),
+      (_req, res) => res.json({ ok: true })
+    );
+
+    await request(customApp)
+      .get("/custom")
+      .set("Authorization", `Bearer customtoken`)
+      .expect(200);
+
+    expect(mockedIntrospectToken).toHaveBeenCalledWith(
+      "customtoken",
+      "access_token",
+      "test-client",
+      "test-secret",
+      "https://acme.auth.blitzware.xyz/api/auth/"
+    );
+  });
 });
 
 describe("Koa middleware (introspection)", () => {
